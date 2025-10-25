@@ -1,4 +1,4 @@
-from pydantic import BaseSettings
+from pydantic_settings import BaseSettings
 from typing import Optional
 import os
 
@@ -37,8 +37,19 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = "FastAPI Authentication API"
     PROJECT_VERSION: str = "1.0.0"
     
+    # CORS Configuration
+    BACKEND_CORS_ORIGINS: list = ["http://localhost:3000", "http://localhost:8000"]
+    
+    # Logging Configuration
+    LOG_LEVEL: str = "INFO"
+    
+    # Rate Limiting Configuration
+    RATE_LIMIT_ENABLED: bool = True
+    RATE_LIMIT_PER_MINUTE: int = 60
+    
     class Config:
         env_file = ".env"
         case_sensitive = True
+        extra = "ignore"
 
 settings = Settings()

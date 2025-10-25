@@ -302,6 +302,7 @@ create_database() {
                 fi
             else
                 print_warning "psql not found. Please install PostgreSQL client."
+                
             fi
         fi
     fi
@@ -386,21 +387,35 @@ check_redis() {
 check_server_running() {
     if curl -s http://localhost:8000/health >/dev/null 2>&1; then
         print_warning "Server is already running on http://localhost:8000"
-        print_warning "Please stop the existing server or use a different port"
         return 1
     fi
     return 0
+}
+
+# Stop any running server
+stop_server() {
+    print_status "Checking for running server..."
+    
+    # Find and kill any existing server processes
+    local server_pids=$(ps aux | grep -E "python.*run.py|uvicorn.*app.main" | grep -v grep | awk '{print $2}')
+    
+    if [ -n "$server_pids" ]; then
+        print_warning "Found running server processes: $server_pids"
+        print_status "Stopping existing server..."
+        echo "$server_pids" | xargs kill -9 2>/dev/null || true
+        sleep 2
+        print_success "Server stopped"
+    else
+        print_success "No running server found"
+    fi
 }
 
 # Start the FastAPI server
 start_server() {
     print_status "Starting FastAPI server..."
     
-    # Check if server is already running
-    if ! check_server_running; then
-        print_error "Cannot start server. Another instance is already running."
-        return 1
-    fi
+    # Stop any existing server first
+    stop_server
     
     echo ""
     echo -e "${CYAN}🚀 FastAPI Authentication API is starting...${NC}"
@@ -579,6 +594,7 @@ show_help() {
     echo "  ./start.sh db-reset     - Reset database (drop and recreate)"
     echo ""
     echo -e "${GREEN}Utility Commands:${NC}"
+    echo "  ./start.sh stop         - Stop running server"
     echo "  ./start.sh clean        - Clean up (remove venv, __pycache__, etc.)"
     echo "  ./start.sh guide        - Show detailed API usage guide"
     echo "  ./start.sh help         - Show this help message"
@@ -783,6 +799,11 @@ case "${1:-dev}" in
     "clean")
         clean_project
         ;;
+    "stop")
+        check_venv
+        activate_venv
+        stop_server
+        ;;
     "guide")
         show_api_guide
         ;;
@@ -796,3 +817,4 @@ case "${1:-dev}" in
         exit 1
         ;;
 esac
+
