@@ -61,18 +61,14 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
         headers={"WWW-Authenticate": "Bearer"},
     )
     
-    user_id = verify_token(token)
+    # Verify JWT token
+    user_id = verify_token(token, token_type="access")
     if user_id is None:
         raise credentials_exception
     
-    # Check session directly to avoid circular import
-    session = db.query(UserSession).filter(
-        UserSession.session_token == token,
-        UserSession.is_active == True,
-        UserSession.expires_at > datetime.utcnow()
-    ).first()
-    
-    if not session:
+    # Get user from database
+    user = db.query(User).filter(User.id == int(user_id)).first()
+    if not user or not user.is_active:
         raise credentials_exception
     
-    return session.user
+    return user

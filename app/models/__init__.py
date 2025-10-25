@@ -1,1 +1,1 @@
-from .user import User, UserSession, MFASettings, APIKey
+from .user import User, UserSession, MFASettings, APIKey, PasswordResetToken

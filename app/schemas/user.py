@@ -53,9 +53,13 @@ class PasswordResetConfirm(BaseModel):
 class MFASetup(BaseModel):
     totp_secret: str
     qr_code: str
+    backup_codes: list[str]
 
 class MFAVerify(BaseModel):
     code: str
+
+class MFABackupCodes(BaseModel):
+    backup_codes: list[str]
 
 class APIKeyCreate(BaseModel):
     key_name: str
@@ -68,6 +72,7 @@ class APIKeyResponse(BaseModel):
     is_active: bool
     created_at: datetime
     expires_at: Optional[datetime] = None
+    last_used: Optional[datetime] = None
 
     class Config:
         from_attributes = True

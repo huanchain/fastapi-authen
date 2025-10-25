@@ -28,7 +28,7 @@ async def update_user_me(
     db.refresh(current_user)
     return current_user
 
-@router.post("/api-keys", response_model=APIKeyResponse)
+@router.post("/api-keys")
 async def create_api_key(
     api_key_data: APIKeyCreate,
     current_user: UserModel = Depends(get_current_user),
@@ -60,13 +60,24 @@ async def create_api_key(
         "api_key": api_key  # Include the actual key in response
     }
 
-@router.get("/api-keys", response_model=list[APIKeyResponse])
+@router.get("/api-keys")
 async def list_api_keys(
     current_user: UserModel = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     api_keys = db.query(APIKey).filter(APIKey.user_id == current_user.id).all()
-    return api_keys
+    return [
+        {
+            "id": key.id,
+            "key_name": key.key_name,
+            "scopes": key.scopes.split(",") if key.scopes else [],
+            "is_active": key.is_active,
+            "created_at": key.created_at,
+            "expires_at": key.expires_at,
+            "last_used": key.last_used
+        }
+        for key in api_keys
+    ]
 
 @router.delete("/api-keys/{key_id}")
 async def revoke_api_key(

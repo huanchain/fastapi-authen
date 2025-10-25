@@ -5,7 +5,9 @@ from app.core.database import get_db
 from app.core.security import verify_token, verify_password, get_password_hash, create_access_token, create_refresh_token, get_current_user
 from app.schemas.user import UserCreate, UserLogin, Token, PasswordChange, PasswordReset, PasswordResetConfirm
 from app.services.auth import AuthService
-from app.models.user import User
+from app.models.user import User, PasswordResetToken
+from datetime import datetime, timedelta
+import secrets
 
 router = APIRouter()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
@@ -95,21 +97,104 @@ async def change_password(
 
 @router.post("/reset-password")
 async def reset_password(reset_data: PasswordReset, db: Session = Depends(get_db)):
-    # In a real implementation, you would:
-    # 1. Generate a reset token
-    # 2. Send an email with the reset link
-    # 3. Store the token in the database with an expiration
+    """Request password reset"""
+    # Find user by email
+    user = db.query(User).filter(User.email == reset_data.email).first()
     
-    return {"message": "Password reset email sent"}
+    if not user:
+        # Don't reveal if user exists for security
+        return {"message": "If the email exists, a password reset link has been sent"}
+    
+    # Generate reset token
+    reset_token = secrets.token_urlsafe(32)
+    expires_at = datetime.utcnow() + timedelta(hours=1)
+    
+    # Store token in database
+    db_token = PasswordResetToken(
+        user_id=user.id,
+        token=reset_token,
+        expires_at=expires_at
+    )
+    db.add(db_token)
+    db.commit()
+    
+    # In production, send email with reset link
+    # For now, we'll just return the token (should be removed in production)
+    reset_link = f"/reset-password?token={reset_token}"
+    
+    return {
+        "message": "Password reset email sent",
+        "reset_token": reset_token,  # Remove this in production
+        "reset_link": reset_link
+    }
 
 @router.post("/reset-password/confirm")
 async def confirm_password_reset(
     reset_data: PasswordResetConfirm,
     db: Session = Depends(get_db)
 ):
-    # In a real implementation, you would:
-    # 1. Verify the reset token
-    # 2. Update the user's password
-    # 3. Invalidate the reset token
+    """Confirm password reset with token"""
+    # Find reset token
+    reset_token_record = db.query(PasswordResetToken).filter(
+        PasswordResetToken.token == reset_data.token,
+        PasswordResetToken.is_used == False,
+        PasswordResetToken.expires_at > datetime.utcnow()
+    ).first()
+    
+    if not reset_token_record:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired reset token"
+        )
+    
+    # Get user
+    user = db.query(User).filter(User.id == reset_token_record.user_id).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+    
+    # Update password
+    user.hashed_password = get_password_hash(reset_data.new_password)
+    
+    # Mark token as used
+    reset_token_record.is_used = True
+    
+    db.commit()
     
     return {"message": "Password reset successfully"}
+
+@router.post("/refresh", response_model=Token)
+async def refresh_token(
+    refresh_token: str,
+    db: Session = Depends(get_db)
+):
+    """Refresh access token using refresh token"""
+    auth_service = AuthService(db)
+    
+    # Verify refresh token
+    user_id = verify_token(refresh_token, token_type="refresh")
+    if not user_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid refresh token"
+        )
+    
+    # Get user
+    user = db.query(User).filter(User.id == int(user_id)).first()
+    if not user or not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found or inactive"
+        )
+    
+    # Create new tokens
+    new_access_token = create_access_token(subject=user.id)
+    new_refresh_token = create_refresh_token(subject=user.id)
+    
+    return {
+        "access_token": new_access_token,
+        "refresh_token": new_refresh_token,
+        "token_type": "bearer"
+    }

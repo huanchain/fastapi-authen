@@ -4,8 +4,8 @@ import os
 
 class Settings(BaseSettings):
     # Database Configuration
-    DATABASE_URL: str = "postgresql://username:password@localhost:5432/fastapi_auth"
-    REDIS_URL: str = "redis://localhost:6379/0"
+    DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./fastapi_auth.db")
+    REDIS_URL: str = os.getenv("REDIS_URL", "redis://localhost:6379/0")
     
     # JWT Configuration
     SECRET_KEY: str = "your-secret-key-here"
