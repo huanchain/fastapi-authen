@@ -2,6 +2,9 @@
 
 A comprehensive authentication API built with FastAPI, featuring user registration, login, MFA, OAuth2 integration, and more.
 
+<img width="1554" height="826" alt="image" src="https://github.com/user-attachments/assets/59cc0a5b-ba87-47e9-a234-948a939c366b" />
+
+
 ## Features
 
 ### Core Authentication
